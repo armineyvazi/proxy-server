@@ -34,7 +34,9 @@ fn suite_setup() {
         // Exact process name only — never `pkill -f proxy-server`, which also
         // matches CI paths like `/home/runner/work/proxy-server/...` and kills
         // the test runner itself.
-        let _ = Command::new("pkill").args(["-9", "-x", "proxy-server"]).status();
+        let _ = Command::new("pkill")
+            .args(["-9", "-x", "proxy-server"])
+            .status();
         // Give the kernel time to release SO_REUSEPORT bindings.
         thread::sleep(Duration::from_millis(300));
     });
