@@ -31,9 +31,10 @@ static SUITE_INIT: OnceLock<()> = OnceLock::new();
 
 fn suite_setup() {
     SUITE_INIT.get_or_init(|| {
-        let _ = Command::new("pkill")
-            .args(["-9", "-f", "proxy-server"])
-            .status();
+        // Exact process name only — never `pkill -f proxy-server`, which also
+        // matches CI paths like `/home/runner/work/proxy-server/...` and kills
+        // the test runner itself.
+        let _ = Command::new("pkill").args(["-9", "-x", "proxy-server"]).status();
         // Give the kernel time to release SO_REUSEPORT bindings.
         thread::sleep(Duration::from_millis(300));
     });
