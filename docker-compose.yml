@@ -1,0 +1,119 @@
+services:
+  upstream:
+    build:
+      context: ./docker/upstream
+    command: ["--addr", "0.0.0.0:9000"]
+    restart: unless-stopped
+    networks:
+      - backend
+
+  proxy-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["--inbound", "0.0.0.0:8080", "--outbound", "upstream:9000"]
+    ports:
+      - "80:8080"       
+    depends_on:
+      - upstream
+    init: true 
+    restart: unless-stopped
+    networks:
+      - backend
+    profiles:
+      - proxy-server
+      
+  nginx:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./docker/nginx/proxy.conf:/etc/nginx/conf.d/proxy.conf:ro
+    ports:
+      - "80:8080"
+    depends_on:
+      - upstream
+    restart: unless-stopped
+    networks:
+      - backend
+    profiles:
+      - nginx
+
+  loadtest:
+    build:
+      context: ./loadtest
+    ports:
+      - "8090:8090"
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    networks:
+      - backend     
+      - monitoring 
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    pid: host          
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+      - '--collector.systemd'
+    ports:
+      - "9100:9100"
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docker/prometheus/rules.yml:/etc/prometheus/rules.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - monitoring
+    depends_on:
+      - node-exporter
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ProxyBench2024!
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SERVER_HTTP_ADDR: "0.0.0.0"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    restart: unless-stopped
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+
+networks:
+  backend:
+    driver: bridge
+  monitoring:
+    driver: bridge
+
+volumes:
+  prometheus_data:
+  grafana_data:

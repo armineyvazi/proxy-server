@@ -1,0 +1,101 @@
+---
+# ── Install Grafana from official apt repo ────────────────────────────────────
+- name: Add Grafana GPG key
+  apt_key:
+    url: https://apt.grafana.com/gpg.key
+    state: present
+
+- name: Add Grafana apt repository
+  apt_repository:
+    repo: "deb https://apt.grafana.com stable main"
+    state: present
+    filename: grafana
+
+- name: Install Grafana
+  apt:
+    name: grafana
+    state: present
+    update_cache: yes
+
+# ── Configure admin credentials & listening address ───────────────────────────
+- name: Set Grafana admin credentials and server config
+  ini_file:
+    path: /etc/grafana/grafana.ini
+    section: "{{ item.section }}"
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+  loop:
+    - { section: server,   option: http_port,        value: "3000" }
+    - { section: server,   option: http_addr,         value: "0.0.0.0" }
+    - { section: security, option: admin_user,         value: "{{ grafana_admin_user }}" }
+    - { section: security, option: admin_password,     value: "{{ grafana_admin_password }}" }
+    - { section: security, option: allow_sign_up,      value: "false" }
+    - { section: auth.anonymous, option: enabled,      value: "false" }
+  notify: restart grafana
+
+# ── Provision Prometheus datasource ──────────────────────────────────────────
+- name: Create Grafana provisioning directory
+  file:
+    path: /etc/grafana/provisioning/datasources
+    state: directory
+    owner: grafana
+    group: grafana
+    mode: '0755'
+
+- name: Provision Prometheus datasource
+  template:
+    src: grafana-datasource.yml.j2
+    dest: /etc/grafana/provisioning/datasources/prometheus.yml
+    owner: grafana
+    group: grafana
+  notify: restart grafana
+
+# ── Start Grafana ─────────────────────────────────────────────────────────────
+- name: Enable and start Grafana
+  systemd:
+    name: grafana-server
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+# ── Import Node Exporter Full dashboard (ID 1860) via API ────────────────────
+- name: Wait for Grafana API to be ready
+  uri:
+    url: "http://localhost:3000/api/health"
+    status_code: 200
+  register: grafana_health
+  retries: 12
+  delay: 5
+  until: grafana_health.status == 200
+
+- name: Fetch Node Exporter Full dashboard JSON from grafana.com
+  uri:
+    url: "https://grafana.com/api/dashboards/1860/revisions/latest/download"
+    method: GET
+    return_content: yes
+  register: ne_dashboard
+
+- name: Import Node Exporter Full dashboard into Grafana
+  uri:
+    url: "http://localhost:3000/api/dashboards/import"
+    method: POST
+    user: "{{ grafana_admin_user }}"
+    password: "{{ grafana_admin_password }}"
+    force_basic_auth: yes
+    body_format: json
+    body:
+      dashboard: "{{ ne_dashboard.json }}"
+      overwrite: true
+      inputs:
+        - name: "DS_PROMETHEUS"
+          type: datasource
+          pluginId: prometheus
+          value: Prometheus
+      folderUid: ""
+    status_code: [200, 412]   # 412 = already exists, that is fine
+  register: dash_import
+  failed_when: dash_import.status not in [200, 412]
+
+- name: Dashboard import result
+  debug:
+    msg: "Dashboard import status: {{ dash_import.status }}"

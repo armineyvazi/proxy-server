@@ -1,0 +1,34 @@
+---
+- name: Install nginx
+  apt:
+    name: nginx
+    state: present
+
+- name: Remove default nginx site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+
+- name: Install proxy config
+  template:
+    src: proxy.conf.j2
+    dest: /etc/nginx/sites-available/proxy.conf
+  notify: reload nginx
+
+- name: Enable proxy site
+  file:
+    src: /etc/nginx/sites-available/proxy.conf
+    dest: /etc/nginx/sites-enabled/proxy.conf
+    state: link
+  notify: reload nginx
+
+- name: Validate nginx config
+  command: nginx -t
+  changed_when: false
+
+- name: "{{ 'Start' if proxy_backend == 'nginx' else 'Stop' }} nginx"
+  systemd:
+    name: nginx
+    state: "{{ 'started' if proxy_backend == 'nginx' else 'stopped' }}"
+    enabled: "{{ proxy_backend == 'nginx' }}"
+    daemon_reload: yes

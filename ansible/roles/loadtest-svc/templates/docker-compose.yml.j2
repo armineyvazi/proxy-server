@@ -1,0 +1,20 @@
+---
+# Loadtest VM: just the load tester.
+# PROXY_URL / NGINX_URL pre-fill the target selector in the web UI at :8090.
+
+services:
+  loadtest:
+    build:
+      context: ./loadtest
+    ports:
+      - "8090:8090"
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      PROXY_URL:  "http://{{ proxy_vm_ip }}"
+      PROXY_HOST: "{{ upstream_proxy_ip }}"
+      NGINX_URL:  "http://{{ nginx_vm_ip }}"
+      NGINX_HOST: "{{ upstream_nginx_ip }}"

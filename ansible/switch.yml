@@ -1,0 +1,41 @@
+---
+# Toggle between proxy-server and nginx on the proxy VM without rebuilding.
+#
+# Usage:
+#   ansible-playbook -i ansible/inventory.ini ansible/switch.yml -e backend=nginx
+#   ansible-playbook -i ansible/inventory.ini ansible/switch.yml -e backend=proxy-server
+
+- name: Switch active proxy backend
+  hosts: proxy_vm
+  become: true
+
+  tasks:
+    - name: Stop all backends
+      command: docker compose stop proxy-server nginx
+      args:
+        chdir: "{{ proxy_dir }}"
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Remove stopped containers (free port 80)
+      command: docker compose rm -f proxy-server nginx
+      args:
+        chdir: "{{ proxy_dir }}"
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Start {{ backend | default('proxy-server') }}
+      command: docker compose --profile {{ backend | default('proxy-server') }} up -d {{ backend | default('proxy-server') }}
+      args:
+        chdir: "{{ proxy_dir }}"
+
+    - name: Show running containers
+      command: docker compose ps
+      args:
+        chdir: "{{ proxy_dir }}"
+      register: ps_out
+      changed_when: false
+
+    - name: Status
+      debug:
+        msg: "{{ ps_out.stdout_lines }}"

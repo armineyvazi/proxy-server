@@ -1,0 +1,14 @@
+[Unit]
+Description=Benchmark upstream HTTP server
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/upstream --addr {{ upstream_host }}:{{ upstream_port }}
+Restart=always
+RestartSec=2s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=upstream
+
+[Install]
+WantedBy=multi-user.target

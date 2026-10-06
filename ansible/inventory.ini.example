@@ -1,0 +1,23 @@
+[proxy_vm]
+proxy.example.com ansible_user=root vm_hostname="rust-proxy-server"
+
+[upstream_proxy_vm]
+upstream-proxy.example.com ansible_user=root vm_hostname="upstream-proxy"
+
+[nginx_vm]
+nginx.example.com ansible_user=root vm_hostname="nginx-proxy"
+
+[upstream_nginx_vm]
+upstream-nginx.example.com ansible_user=root vm_hostname="upstream-nginx"
+
+[loadtest_proxy_vm]
+loadtest-proxy.example.com ansible_user=root vm_hostname="loadtest-proxy"
+
+[loadtest_nginx_vm]
+loadtest-nginx.example.com ansible_user=root vm_hostname="loadtest-nginx"
+
+[monitor_vm]
+monitor.example.com ansible_user=root vm_hostname="monitor"
+
+[all:vars]
+ansible_python_interpreter=/usr/bin/python3

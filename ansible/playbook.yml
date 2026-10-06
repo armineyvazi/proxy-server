@@ -1,0 +1,110 @@
+---
+# 7-VM benchmark stack.
+#
+# Traffic flows:
+#   loadtest-proxy  (185.248.32.142) → rust-proxy-server (185.248.32.144) → upstream-proxy (185.248.32.146)
+#   loadtest-nginx  (87.247.174.212) → nginx-proxy       (185.248.32.147) → upstream-nginx (185.248.32.118)
+#
+# Prometheus on monitor (78.111.5.44) scrapes:
+#   rust-proxy-server :9100, nginx-proxy :9100, loadtest-proxy :8090, loadtest-nginx :8090
+#
+# Run all:
+#   ansible-playbook -i ansible/inventory.ini ansible/playbook.yml
+#
+# Switch proxy VM to nginx:
+#   ansible-playbook -i ansible/inventory.ini ansible/switch.yml -e backend=nginx
+
+- name: Deploy upstream for proxy-server
+  hosts: upstream_proxy_vm
+  become: true
+  pre_tasks:
+    - name: Set hostname
+      hostname:
+        name: "{{ vm_hostname }}"
+  roles:
+    - docker
+    - upstream-svc
+
+- name: Deploy upstream for nginx
+  hosts: upstream_nginx_vm
+  become: true
+  pre_tasks:
+    - name: Set hostname
+      hostname:
+        name: "{{ vm_hostname }}"
+  roles:
+    - docker
+    - upstream-svc
+
+- name: Deploy Rust proxy-server + node-exporter
+  hosts: proxy_vm
+  become: true
+  pre_tasks:
+    - name: Set hostname
+      hostname:
+        name: "{{ vm_hostname }}"
+  roles:
+    - docker
+    - proxy
+
+- name: Deploy nginx + node-exporter
+  hosts: nginx_vm
+  become: true
+  pre_tasks:
+    - name: Set hostname
+      hostname:
+        name: "{{ vm_hostname }}"
+  roles:
+    - docker
+    - nginx-svc
+
+- name: Deploy loadtest for proxy-server
+  hosts: loadtest_proxy_vm
+  become: true
+  pre_tasks:
+    - name: Set hostname
+      hostname:
+        name: "{{ vm_hostname }}"
+  roles:
+    - docker
+    - loadtest-svc
+
+- name: Deploy loadtest for nginx
+  hosts: loadtest_nginx_vm
+  become: true
+  pre_tasks:
+    - name: Set hostname
+      hostname:
+        name: "{{ vm_hostname }}"
+  roles:
+    - docker
+    - loadtest-svc
+
+- name: Deploy Prometheus + Grafana
+  hosts: monitor_vm
+  become: true
+  pre_tasks:
+    - name: Set hostname
+      hostname:
+        name: "{{ vm_hostname }}"
+  roles:
+    - docker
+    - monitor
+
+  post_tasks:
+    - name: Print access URLs
+      debug:
+        msg:
+          - "═══════════════════════════════════════════════════"
+          - "Grafana         : http://{{ monitor_ip }}:3000"
+          - "                  user: {{ grafana_admin_user }} / {{ grafana_admin_password }}"
+          - "Prometheus      : http://{{ monitor_ip }}:9090"
+          - "═══════════════════════════════════════════════════"
+          - "Loadtest → proxy: http://{{ loadtest_proxy_ip }}:8090"
+          - "  URL  : http://{{ proxy_vm_ip }}"
+          - "  Host : {{ upstream_proxy_ip }}"
+          - "───────────────────────────────────────────────────"
+          - "Loadtest → nginx: http://{{ loadtest_nginx_ip }}:8090"
+          - "  URL  : http://{{ nginx_vm_ip }}"
+          - "  Host : (any — nginx has no Host restriction)"
+          - "═══════════════════════════════════════════════════"

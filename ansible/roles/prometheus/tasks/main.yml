@@ -1,0 +1,103 @@
+---
+- name: Create prometheus system user
+  user:
+    name: prometheus
+    system: yes
+    shell: /sbin/nologin
+    create_home: no
+
+- name: Create prometheus directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: prometheus
+    group: prometheus
+    mode: '0755'
+  loop:
+    - /etc/prometheus
+    - /var/lib/prometheus
+
+- name: Check if prometheus is installed
+  stat:
+    path: /usr/local/bin/prometheus
+  register: prom_bin
+
+- name: Download prometheus {{ prometheus_version }}
+  get_url:
+    url: "https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+    dest: /tmp/prometheus.tar.gz
+    mode: '0644'
+  when: not prom_bin.stat.exists
+
+- name: Extract prometheus
+  unarchive:
+    src: /tmp/prometheus.tar.gz
+    dest: /tmp
+    remote_src: yes
+  when: not prom_bin.stat.exists
+
+- name: Install prometheus binaries
+  copy:
+    src: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    mode: '0755'
+    remote_src: yes
+  loop:
+    - prometheus
+    - promtool
+  when: not prom_bin.stat.exists
+
+- name: Install prometheus console templates
+  copy:
+    src: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64/{{ item }}"
+    dest: "/etc/prometheus/{{ item }}"
+    remote_src: yes
+    owner: prometheus
+    group: prometheus
+  loop:
+    - consoles
+    - console_libraries
+  when: not prom_bin.stat.exists
+
+- name: Install prometheus config
+  template:
+    src: prometheus.yml.j2
+    dest: /etc/prometheus/prometheus.yml
+    owner: prometheus
+    group: prometheus
+  notify: restart prometheus
+
+- name: Install prometheus systemd service
+  copy:
+    dest: /etc/systemd/system/prometheus.service
+    content: |
+      [Unit]
+      Description=Prometheus Monitoring
+      After=network.target
+
+      [Service]
+      User=prometheus
+      Group=prometheus
+      Type=simple
+      ExecStart=/usr/local/bin/prometheus \
+          --config.file=/etc/prometheus/prometheus.yml \
+          --storage.tsdb.path=/var/lib/prometheus \
+          --storage.tsdb.retention.time=7d \
+          --web.listen-address=0.0.0.0:9090 \
+          --web.enable-lifecycle
+      Restart=always
+      RestartSec=5s
+      StandardOutput=journal
+      StandardError=journal
+      SyslogIdentifier=prometheus
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: restart prometheus
+
+- name: Enable and start prometheus
+  systemd:
+    name: prometheus
+    state: started
+    enabled: yes
+    daemon_reload: yes

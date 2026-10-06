@@ -1,0 +1,18 @@
+/target/
+**/*.rs.bk
+.DS_Store
+.claude/
+presentation.html
+presentation.html*.pdf
+*.pdf
+
+# Nested / packaging copies — not part of the published tree
+/proxy-server/
+/send/
+
+# Built binaries (rebuild with cargo / go)
+/loadtest/loadtest
+/docker/upstream/upstream
+
+# Local Ansible inventory with real hosts (keep the example)
+/ansible/inventory.ini

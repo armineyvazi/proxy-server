@@ -1,0 +1,64 @@
+---
+- name: Check if Go is installed
+  stat:
+    path: /usr/local/go/bin/go
+  register: go_bin
+
+- name: Download Go {{ go_version }}
+  get_url:
+    url: "https://dl.google.com/go/go{{ go_version }}.linux-amd64.tar.gz"
+    dest: /tmp/go.tar.gz
+    mode: '0644'
+  when: not go_bin.stat.exists
+
+- name: Extract Go to /usr/local
+  unarchive:
+    src: /tmp/go.tar.gz
+    dest: /usr/local
+    remote_src: yes
+  when: not go_bin.stat.exists
+
+- name: Create upstream source directory
+  file:
+    path: /opt/upstream
+    state: directory
+    mode: '0755'
+
+- name: Copy upstream source files
+  copy:
+    src: "{{ item }}"
+    dest: /opt/upstream/
+  loop:
+    - upstream.go
+    - go.mod
+  register: upstream_src
+
+- name: Build upstream binary
+  command: /usr/local/go/bin/go build -o /usr/local/bin/upstream .
+  args:
+    chdir: /opt/upstream
+  when: upstream_src.changed
+
+- name: Ensure upstream binary is present (first deploy)
+  stat:
+    path: /usr/local/bin/upstream
+  register: upstream_bin
+
+- name: Build upstream binary (first deploy)
+  command: /usr/local/go/bin/go build -o /usr/local/bin/upstream .
+  args:
+    chdir: /opt/upstream
+  when: not upstream_bin.stat.exists
+
+- name: Install upstream systemd service
+  template:
+    src: upstream.service.j2
+    dest: /etc/systemd/system/upstream.service
+  notify: restart upstream
+
+- name: Enable and start upstream
+  systemd:
+    name: upstream
+    state: started
+    enabled: yes
+    daemon_reload: yes

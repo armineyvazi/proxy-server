@@ -1,0 +1,8 @@
+target/
+.git/
+tests/
+ansible/
+loadtest/
+docker/
+*.md
+.dockerignore

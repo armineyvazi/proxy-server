@@ -1,0 +1,15 @@
+---
+# Loadtest VM: just the load tester.
+# Target URL and Host header are configured in the web UI at :8090.
+
+services:
+  loadtest:
+    build:
+      context: ./loadtest
+    ports:
+      - "8090:8090"
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536

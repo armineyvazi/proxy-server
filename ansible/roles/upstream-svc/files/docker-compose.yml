@@ -1,0 +1,30 @@
+---
+# Upstream VM stack: Go HTTP benchmark server + node-exporter.
+# Port 9000 must be reachable from the proxy VM (78.111.5.44).
+
+services:
+
+  upstream:
+    build:
+      context: ./upstream
+    command: ["--addr", "0.0.0.0:9000"]
+    ports:
+      - "9000:9000"   # proxy VM connects here
+    restart: unless-stopped
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+      - '--collector.systemd'
+    ports:
+      - "9100:9100"   # scraped by Prometheus on monitor VM
+    restart: unless-stopped

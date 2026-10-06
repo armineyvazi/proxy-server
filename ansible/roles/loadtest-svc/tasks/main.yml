@@ -1,0 +1,62 @@
+---
+# Deploys the load tester on a dedicated VM.
+# Web UI at :8090 — set the target URL in the browser.
+
+- name: Create loadtest project directory
+  file:
+    path: "{{ loadtest_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Template docker-compose.yml (injects target URLs)
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ loadtest_dir }}/docker-compose.yml"
+
+- name: Copy loadtest/ source
+  copy:
+    src: "{{ playbook_dir }}/../loadtest/"
+    dest: "{{ loadtest_dir }}/loadtest/"
+  register: loadtest_src
+
+- name: Build loadtest image (only when source changed)
+  command: docker compose build loadtest
+  args:
+    chdir: "{{ loadtest_dir }}"
+  environment:
+    DOCKER_BUILDKIT: "1"
+    BUILDKIT_PROGRESS: "plain"
+  when: loadtest_src.changed
+
+- name: Ensure loadtest image exists (first deploy)
+  command: docker image inspect loadtest-loadtest
+  register: image_check
+  ignore_errors: yes
+  changed_when: false
+
+- name: Build loadtest image (first deploy)
+  command: docker compose build loadtest
+  args:
+    chdir: "{{ loadtest_dir }}"
+  environment:
+    DOCKER_BUILDKIT: "1"
+    BUILDKIT_PROGRESS: "plain"
+  when: image_check.rc != 0
+
+- name: Start loadtest service
+  command: docker compose up -d
+  args:
+    chdir: "{{ loadtest_dir }}"
+  environment:
+    DOCKER_BUILDKIT: "1"
+
+- name: Show loadtest VM containers
+  command: docker compose ps
+  args:
+    chdir: "{{ loadtest_dir }}"
+  register: ps_out
+  changed_when: false
+
+- name: Loadtest VM status
+  debug:
+    msg: "{{ ps_out.stdout_lines }}"

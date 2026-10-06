@@ -1,0 +1,27 @@
+# nginx reverse proxy — upstream is the dedicated benchmark target VM.
+# keepalive 64 = persistent connection pool, avoids TCP handshake per request.
+upstream benchmark_backend {
+    server {{ upstream_nginx_ip }}:9000;
+    keepalive 64;
+    keepalive_timeout 60s;
+}
+
+server {
+    listen 8080;
+    server_name _;
+    access_log off;
+    error_log  /var/log/nginx/error.log warn;
+
+    location / {
+        proxy_pass         http://benchmark_backend;
+        proxy_http_version 1.1;
+        proxy_set_header   Connection        "";
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_connect_timeout  5s;
+        proxy_read_timeout    30s;
+        proxy_send_timeout    30s;
+        proxy_buffering       off;
+    }
+}

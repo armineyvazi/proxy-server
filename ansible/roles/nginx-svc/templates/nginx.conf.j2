@@ -1,0 +1,36 @@
+# Custom nginx main config — tuned to match rust-proxy-server benchmark conditions.
+# Key parameters mirrored from the Rust proxy:
+#   worker count     : auto (one per logical CPU, same as Rust's count_cpus())
+#   fd limit         : 1,048,576 (same as Rust's raise_fd_limit())
+#   upstream keepalive: 64 pooled connections (Rust pool size = 64)
+
+user  nginx;
+worker_processes  auto;
+worker_rlimit_nofile  1048576;
+
+error_log  /var/log/nginx/error.log warn;
+pid        /var/run/nginx.pid;
+
+events {
+    worker_connections  65536;
+    use  epoll;
+    multi_accept  on;
+}
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    sendfile    on;
+    tcp_nopush  on;
+    tcp_nodelay on;
+
+    # Match Rust proxy: no access logging (saves I/O on benchmark path)
+    access_log  off;
+
+    # Keep-alive to CLIENTS: allow up to 10000 requests per connection
+    keepalive_timeout   65s;
+    keepalive_requests  10000;
+
+    include /etc/nginx/conf.d/*.conf;
+}

@@ -1,0 +1,319 @@
+{
+  "__inputs": [],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "11.0.0" },
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" },
+    { "type": "panel", "id": "timeseries", "name": "Time series", "version": "" },
+    { "type": "panel", "id": "stat", "name": "Stat", "version": "" }
+  ],
+  "annotations": { "list": [] },
+  "description": "proxy-server (Rust) vs nginx — side-by-side in single panels using backend label",
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "id": 100, "title": "Throughput & Latency Comparison", "type": "row" },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2.5, "fillOpacity": 10, "lineInterpolation": "smooth", "drawStyle": "line", "showPoints": "never", "spanNulls": true }, "unit": "reqps" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "rust-proxy-server" }, "properties": [{ "id": "color", "value": { "fixedColor": "#4f8ef7", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "nginx" },             "properties": [{ "id": "color", "value": { "fixedColor": "#22c55e", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 1 },
+      "id": 1,
+      "options": { "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "loadtest_rps{job=\"loadtest_proxy\"}", "legendFormat": "rust-proxy-server", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "loadtest_rps{job=\"loadtest_nginx\"}",  "legendFormat": "nginx",            "refId": "B" }
+      ],
+      "title": "Requests / Second",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2, "fillOpacity": 8, "lineInterpolation": "smooth", "drawStyle": "line", "showPoints": "never", "spanNulls": true }, "unit": "s", "decimals": 3 },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "proxy p50" }, "properties": [{ "id": "color", "value": { "fixedColor": "#60a5fa", "mode": "fixed" } }, { "id": "custom.lineWidth", "value": 1.5 }] },
+          { "matcher": { "id": "byName", "options": "proxy p95" }, "properties": [{ "id": "color", "value": { "fixedColor": "#4f8ef7", "mode": "fixed" } }, { "id": "custom.lineWidth", "value": 2 }] },
+          { "matcher": { "id": "byName", "options": "proxy p99" }, "properties": [{ "id": "color", "value": { "fixedColor": "#1d4ed8", "mode": "fixed" } }, { "id": "custom.lineWidth", "value": 2.5 }] },
+          { "matcher": { "id": "byName", "options": "nginx p50" }, "properties": [{ "id": "color", "value": { "fixedColor": "#86efac", "mode": "fixed" } }, { "id": "custom.lineWidth", "value": 1.5 }] },
+          { "matcher": { "id": "byName", "options": "nginx p95" }, "properties": [{ "id": "color", "value": { "fixedColor": "#22c55e", "mode": "fixed" } }, { "id": "custom.lineWidth", "value": 2 }] },
+          { "matcher": { "id": "byName", "options": "nginx p99" }, "properties": [{ "id": "color", "value": { "fixedColor": "#15803d", "mode": "fixed" } }, { "id": "custom.lineWidth", "value": 2.5 }] }
+        ]
+      },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 1 },
+      "id": 2,
+      "options": { "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "loadtest_latency_p50_seconds{job=\"loadtest_proxy\"}", "legendFormat": "proxy p50", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "loadtest_latency_p95_seconds{job=\"loadtest_proxy\"}", "legendFormat": "proxy p95", "refId": "B" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "loadtest_latency_p99_seconds{job=\"loadtest_proxy\"}", "legendFormat": "proxy p99", "refId": "C" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "loadtest_latency_p50_seconds{job=\"loadtest_nginx\"}",  "legendFormat": "nginx p50",  "refId": "D" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "loadtest_latency_p95_seconds{job=\"loadtest_nginx\"}",  "legendFormat": "nginx p95",  "refId": "E" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "loadtest_latency_p99_seconds{job=\"loadtest_nginx\"}",  "legendFormat": "nginx p99",  "refId": "F" }
+      ],
+      "title": "Latency — p50 / p95 / p99 (blue=proxy, green=nginx)",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2, "fillOpacity": 15, "lineInterpolation": "smooth", "drawStyle": "line", "showPoints": "never", "spanNulls": true }, "unit": "s", "decimals": 3 },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "proxy p50" }, "properties": [{ "id": "color", "value": { "fixedColor": "#60a5fa", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "proxy p95" }, "properties": [{ "id": "color", "value": { "fixedColor": "#4f8ef7", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "proxy p99" }, "properties": [{ "id": "color", "value": { "fixedColor": "#1d4ed8", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "nginx p50" }, "properties": [{ "id": "color", "value": { "fixedColor": "#86efac", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "nginx p95" }, "properties": [{ "id": "color", "value": { "fixedColor": "#22c55e", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "nginx p99" }, "properties": [{ "id": "color", "value": { "fixedColor": "#15803d", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 10 },
+      "id": 3,
+      "options": { "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "right" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "histogram_quantile(0.50, rate(loadtest_latency_seconds_bucket{job=\"loadtest_proxy\"}[30s]))", "legendFormat": "proxy p50", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "histogram_quantile(0.95, rate(loadtest_latency_seconds_bucket{job=\"loadtest_proxy\"}[30s]))", "legendFormat": "proxy p95", "refId": "B" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "histogram_quantile(0.99, rate(loadtest_latency_seconds_bucket{job=\"loadtest_proxy\"}[30s]))", "legendFormat": "proxy p99", "refId": "C" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "histogram_quantile(0.50, rate(loadtest_latency_seconds_bucket{job=\"loadtest_nginx\"}[30s]))",  "legendFormat": "nginx p50",  "refId": "D" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "histogram_quantile(0.95, rate(loadtest_latency_seconds_bucket{job=\"loadtest_nginx\"}[30s]))",  "legendFormat": "nginx p95",  "refId": "E" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "histogram_quantile(0.99, rate(loadtest_latency_seconds_bucket{job=\"loadtest_nginx\"}[30s]))",  "legendFormat": "nginx p99",  "refId": "F" }
+      ],
+      "title": "Latency Distribution — histogram quantiles (blue=proxy, green=nginx)",
+      "type": "timeseries"
+    },
+
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 19 }, "id": 101, "title": "Status Codes & Errors", "type": "row" },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2, "fillOpacity": 15, "lineInterpolation": "smooth", "drawStyle": "line", "showPoints": "never", "spanNulls": true }, "unit": "reqps" },
+        "overrides": [
+          { "matcher": { "id": "byRegexp", "options": "proxy.*200" }, "properties": [{ "id": "color", "value": { "fixedColor": "#4f8ef7", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "nginx.*200" },  "properties": [{ "id": "color", "value": { "fixedColor": "#22c55e", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "proxy.*error|proxy.*5.." }, "properties": [{ "id": "color", "value": { "fixedColor": "#818cf8", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "nginx.*error|nginx.*5.."  }, "properties": [{ "id": "color", "value": { "fixedColor": "#86efac", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 9, "w": 16, "x": 0, "y": 20 },
+      "id": 5,
+      "options": { "legend": { "calcs": ["sum", "lastNotNull"], "displayMode": "table", "placement": "right" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "rate(loadtest_requests_total{job=\"loadtest_proxy\"}[30s])", "legendFormat": "proxy {{code}}", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "rate(loadtest_requests_total{job=\"loadtest_nginx\"}[30s])",  "legendFormat": "nginx {{code}}",  "refId": "B" }
+      ],
+      "title": "HTTP Status Code Rate — proxy + nginx in one panel",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2, "fillOpacity": 20, "lineInterpolation": "smooth", "drawStyle": "line", "showPoints": "never", "spanNulls": true }, "unit": "percent" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "rust-proxy-server" }, "properties": [{ "id": "color", "value": { "fixedColor": "#4f8ef7", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "nginx" },             "properties": [{ "id": "color", "value": { "fixedColor": "#22c55e", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 20 },
+      "id": 6,
+      "options": { "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "(rate(loadtest_requests_total{job=\"loadtest_proxy\",code=\"error\"}[$__rate_interval]) + rate(loadtest_requests_total{job=\"loadtest_proxy\",code=~\"5..\"}[$__rate_interval])) / rate(loadtest_requests_total{job=\"loadtest_proxy\"}[$__rate_interval]) * 100", "legendFormat": "rust-proxy-server", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "(rate(loadtest_requests_total{job=\"loadtest_nginx\",code=\"error\"}[$__rate_interval]) + rate(loadtest_requests_total{job=\"loadtest_nginx\",code=~\"5..\"}[$__rate_interval]))  / rate(loadtest_requests_total{job=\"loadtest_nginx\"}[$__rate_interval])  * 100", "legendFormat": "nginx",            "refId": "B" }
+      ],
+      "title": "Error Rate % (network errors + 5xx)",
+      "type": "timeseries"
+    },
+
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 29 }, "id": 102, "title": "Current Snapshot", "type": "row" },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }, "mappings": [] },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "proxy RPS" },      "properties": [{ "id": "unit", "value": "reqps" }, { "id": "color", "value": { "fixedColor": "#4f8ef7", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "nginx RPS" },       "properties": [{ "id": "unit", "value": "reqps" }, { "id": "color", "value": { "fixedColor": "#22c55e", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": ".* p95" },        "properties": [{ "id": "unit", "value": "s" },     { "id": "color", "value": { "fixedColor": "#f59e0b", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": ".* p99" },        "properties": [{ "id": "unit", "value": "s" },     { "id": "color", "value": { "fixedColor": "#ef4444", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": ".* err%" },       "properties": [{ "id": "unit", "value": "percent"} ] }
+        ]
+      },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 30 },
+      "id": 7,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background" },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "loadtest_rps{job=\"loadtest_proxy\"}", "legendFormat": "proxy RPS", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "loadtest_rps{job=\"loadtest_nginx\"}",  "legendFormat": "nginx RPS",  "refId": "B" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "loadtest_latency_p95_seconds{job=\"loadtest_proxy\"}", "legendFormat": "proxy p95", "refId": "C" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "loadtest_latency_p99_seconds{job=\"loadtest_proxy\"}", "legendFormat": "proxy p99", "refId": "D" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "loadtest_latency_p95_seconds{job=\"loadtest_nginx\"}",  "legendFormat": "nginx p95",  "refId": "E" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "loadtest_latency_p99_seconds{job=\"loadtest_nginx\"}",  "legendFormat": "nginx p99",  "refId": "F" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "rate(loadtest_requests_total{job=\"loadtest_proxy\",code=~\"error|5..\"}[$__rate_interval]) / rate(loadtest_requests_total{job=\"loadtest_proxy\"}[$__rate_interval]) * 100", "legendFormat": "proxy err%", "refId": "G" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "rate(loadtest_requests_total{job=\"loadtest_nginx\",code=~\"error|5..\"}[$__rate_interval])  / rate(loadtest_requests_total{job=\"loadtest_nginx\"}[$__rate_interval])  * 100", "legendFormat": "nginx err%",  "refId": "H" }
+      ],
+      "title": "Current Snapshot — all in one",
+      "type": "stat"
+    },
+
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 }, "id": 103, "title": "System Resources (rust-proxy-server vs nginx-proxy)", "type": "row" },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2, "fillOpacity": 10, "lineInterpolation": "smooth", "drawStyle": "line", "showPoints": "never" }, "unit": "percentunit", "min": 0, "max": 1 },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "rust-proxy-server" }, "properties": [{ "id": "color", "value": { "fixedColor": "#4f8ef7", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "nginx-proxy" },       "properties": [{ "id": "color", "value": { "fixedColor": "#22c55e", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 37 },
+      "id": 8,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "1 - avg(rate(node_cpu_seconds_total{mode=\"idle\",instance=\"rust-proxy-server\"}[1m]))", "legendFormat": "rust-proxy-server", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "1 - avg(rate(node_cpu_seconds_total{mode=\"idle\",instance=\"nginx-proxy\"}[1m]))",        "legendFormat": "nginx-proxy",       "refId": "B" }
+      ],
+      "title": "CPU Usage",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2, "fillOpacity": 10, "lineInterpolation": "smooth", "drawStyle": "line", "showPoints": "never" }, "unit": "bytes" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "rust-proxy-server" }, "properties": [{ "id": "color", "value": { "fixedColor": "#4f8ef7", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "nginx-proxy" },       "properties": [{ "id": "color", "value": { "fixedColor": "#22c55e", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 37 },
+      "id": 9,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "node_memory_MemTotal_bytes{instance=\"rust-proxy-server\"} - node_memory_MemAvailable_bytes{instance=\"rust-proxy-server\"}", "legendFormat": "rust-proxy-server", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "node_memory_MemTotal_bytes{instance=\"nginx-proxy\"} - node_memory_MemAvailable_bytes{instance=\"nginx-proxy\"}",             "legendFormat": "nginx-proxy",       "refId": "B" }
+      ],
+      "title": "Memory Used",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2, "fillOpacity": 8, "lineInterpolation": "smooth", "drawStyle": "line", "showPoints": "never" }, "unit": "Bps" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "proxy rx" }, "properties": [{ "id": "color", "value": { "fixedColor": "#4f8ef7", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "proxy tx" }, "properties": [{ "id": "color", "value": { "fixedColor": "#818cf8", "mode": "fixed" }, "custom": { "transform": "negative-Y" } }] },
+          { "matcher": { "id": "byName", "options": "nginx rx" }, "properties": [{ "id": "color", "value": { "fixedColor": "#22c55e", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "nginx tx" }, "properties": [{ "id": "color", "value": { "fixedColor": "#86efac", "mode": "fixed" }, "custom": { "transform": "negative-Y" } }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 45 },
+      "id": 11,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "rate(node_network_receive_bytes_total{instance=\"rust-proxy-server\",device!~\"lo|docker.*|veth.*\"}[1m])",  "legendFormat": "proxy rx",  "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "rate(node_network_transmit_bytes_total{instance=\"rust-proxy-server\",device!~\"lo|docker.*|veth.*\"}[1m])", "legendFormat": "proxy tx",  "refId": "B" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "rate(node_network_receive_bytes_total{instance=\"nginx-proxy\",device!~\"lo|docker.*|veth.*\"}[1m])",        "legendFormat": "nginx rx",  "refId": "C" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "rate(node_network_transmit_bytes_total{instance=\"nginx-proxy\",device!~\"lo|docker.*|veth.*\"}[1m])",       "legendFormat": "nginx tx",  "refId": "D" }
+      ],
+      "title": "Network Throughput (rx up / tx down)",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2, "fillOpacity": 8, "lineInterpolation": "smooth", "drawStyle": "line", "showPoints": "never" }, "unit": "short" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "rust-proxy-server" }, "properties": [{ "id": "color", "value": { "fixedColor": "#4f8ef7", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "nginx-proxy" },       "properties": [{ "id": "color", "value": { "fixedColor": "#22c55e", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 45 },
+      "id": 12,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"] }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "node_netstat_Tcp_CurrEstab{instance=\"rust-proxy-server\"}", "legendFormat": "rust-proxy-server", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "node_netstat_Tcp_CurrEstab{instance=\"nginx-proxy\"}",        "legendFormat": "nginx-proxy",       "refId": "B" }
+      ],
+      "title": "Active TCP Connections",
+      "type": "timeseries"
+    },
+
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 53 }, "id": 104, "title": "collect_logs Interference (rust-proxy-server only)", "type": "row" },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2, "fillOpacity": 8, "lineInterpolation": "smooth", "drawStyle": "line", "showPoints": "never", "spanNulls": true }, "unit": "s", "decimals": 3 },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "proxy p95" },        "properties": [{ "id": "color", "value": { "fixedColor": "#4f8ef7", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "proxy p99" },        "properties": [{ "id": "color", "value": { "fixedColor": "#818cf8", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "collect_logs p95" }, "properties": [{ "id": "color", "value": { "fixedColor": "#f59e0b", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "collect_logs p99" }, "properties": [{ "id": "color", "value": { "fixedColor": "#ef4444", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 54 },
+      "id": 13,
+      "options": { "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "loadtest_latency_p95_seconds{job=\"loadtest_proxy\"}", "legendFormat": "proxy p95",        "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "loadtest_latency_p99_seconds{job=\"loadtest_proxy\"}", "legendFormat": "proxy p99",        "refId": "B" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "collect_logs_latency_p95_seconds{job=\"loadtest_proxy\"}", "legendFormat": "collect_logs p95", "refId": "C" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "collect_logs_latency_p99_seconds{job=\"loadtest_proxy\"}", "legendFormat": "collect_logs p99", "refId": "D" }
+      ],
+      "title": "Proxy vs collect_logs latency (same panel — shows interference or independence)",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }, "mappings": [] },
+        "overrides": [
+          { "matcher": { "id": "byRegexp", "options": ".*p95.*" }, "properties": [{ "id": "unit", "value": "s" }, { "id": "color", "value": { "fixedColor": "#f59e0b", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": ".*p99.*" }, "properties": [{ "id": "unit", "value": "s" }, { "id": "color", "value": { "fixedColor": "#ef4444", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": ".*total.*" }, "properties": [{ "id": "unit", "value": "short" }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 54 },
+      "id": 14,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background" },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "collect_logs_latency_p95_seconds{job=\"loadtest_proxy\"}", "legendFormat": "collect_logs p95", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "collect_logs_latency_p99_seconds{job=\"loadtest_proxy\"}", "legendFormat": "collect_logs p99", "refId": "B" },
+        { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "collect_logs_requests_total{job=\"loadtest_proxy\",code=\"200\"}", "legendFormat": "collect_logs 200 total", "refId": "C" }
+      ],
+      "title": "collect_logs Snapshot",
+      "type": "stat"
+    }
+
+  ],
+  "refresh": "5s",
+  "schemaVersion": 39,
+  "tags": ["benchmark", "comparison"],
+  "templating": {
+    "list": [
+      { "current": {}, "hide": 0, "includeAll": false, "label": "Datasource", "multi": false, "name": "datasource", "options": [], "query": "prometheus", "refresh": 1, "type": "datasource" }
+    ]
+  },
+  "time": { "from": "now-15m", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "proxy-server vs nginx Comparison",
+  "uid": "proxy-comparison-v1",
+  "version": 2
+}

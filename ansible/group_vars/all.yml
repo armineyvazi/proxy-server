@@ -1,0 +1,20 @@
+---
+# ── VM IPs ────────────────────────────────────────────────────────────────────
+proxy_vm_ip:       "185.248.32.144"   # Rust proxy-server + node-exporter
+upstream_proxy_ip: "185.248.32.146"   # upstream for proxy-server (no node-exporter)
+nginx_vm_ip:       "185.248.32.147"   # nginx + node-exporter
+upstream_nginx_ip: "185.248.32.118"   # upstream for nginx (no node-exporter)
+loadtest_proxy_ip: "185.248.32.142"   # loadtest sending traffic to proxy-server
+loadtest_nginx_ip: "87.247.174.212"   # loadtest sending traffic to nginx
+monitor_ip:        "78.111.5.44"      # prometheus + grafana
+
+# ── Project paths on each VM ──────────────────────────────────────────────────
+proxy_dir:    "/opt/proxy-stack"
+upstream_dir: "/opt/upstream"
+nginx_dir:    "/opt/nginx-stack"
+loadtest_dir: "/opt/loadtest"
+monitor_dir:  "/opt/monitor"
+
+# ── Grafana ───────────────────────────────────────────────────────────────────
+grafana_admin_user:     "admin"
+grafana_admin_password: "ProxyBench2024!"

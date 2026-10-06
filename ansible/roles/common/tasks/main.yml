@@ -1,0 +1,23 @@
+---
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install system build dependencies
+  apt:
+    name:
+      - build-essential
+      - pkg-config
+      - curl
+      - wget
+      - git
+      - rsync
+      - unzip
+      - libssl-dev
+      - ca-certificates
+      - gnupg
+      - lsb-release
+      - apt-transport-https
+      - software-properties-common
+    state: present

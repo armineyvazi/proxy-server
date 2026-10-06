@@ -1,0 +1,61 @@
+groups:
+  - name: loadtest_recording
+    interval: 5s
+    rules:
+      - record: loadtest:requests:rate1m
+        expr: sum(rate(loadtest_requests_total[1m]))
+
+      - record: loadtest:errors:ratio1m
+        expr: |
+          sum(rate(loadtest_requests_total{code=~"error|5.."}[1m]))
+          /
+          clamp_min(sum(rate(loadtest_requests_total[1m])), 1)
+
+      - record: loadtest:latency_seconds:p99_1m
+        expr: histogram_quantile(0.99, sum(rate(loadtest_latency_seconds_bucket[1m])) by (le))
+
+      - record: loadtest:latency_seconds:p50_1m
+        expr: histogram_quantile(0.50, sum(rate(loadtest_latency_seconds_bucket[1m])) by (le))
+
+  - name: loadtest_alerts
+    rules:
+      - alert: LoadtestHighErrorRate
+        expr: loadtest:errors:ratio1m > 0.05 and loadtest:requests:rate1m > 1
+        for: 30s
+        labels: { severity: warning }
+        annotations:
+          summary: "Error rate above 5% during load test"
+          description: "{{ $value | humanizePercentage }} of requests are failing (transport errors or 5xx)."
+
+      - alert: LoadtestSLABreachP99
+        expr: loadtest:latency_seconds:p99_1m > 0.1 and loadtest:requests:rate1m > 1
+        for: 1m
+        labels: { severity: warning }
+        annotations:
+          summary: "p99 latency above the 100 ms SLA"
+          description: "Windowed p99 is {{ $value | humanizeDuration }}."
+
+  - name: host_alerts
+    rules:
+      - alert: TargetDown
+        expr: up == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "Scrape target {{ $labels.job }} is down"
+
+      - alert: ProxyHostCPUSaturated
+        expr: 1 - avg(rate(node_cpu_seconds_total{mode="idle"}[1m])) > 0.9
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: "Host CPU above 90%"
+          description: "Sustained CPU saturation can cap throughput and inflate tail latency."
+
+      - alert: HostFileDescriptorsExhausting
+        expr: node_filefd_allocated / node_filefd_maximum > 0.8
+        for: 1m
+        labels: { severity: warning }
+        annotations:
+          summary: "Open file descriptors above 80% of the limit"
+          description: "Each connection uses two FDs; exhaustion shows up as connection-refused/EMFILE."

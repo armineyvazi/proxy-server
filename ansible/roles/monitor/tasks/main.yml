@@ -1,0 +1,80 @@
+---
+# Deploys Prometheus + Grafana on the monitor VM (78.111.5.44).
+# Scrapes node-exporter from proxy and nginx VMs, and loadtest metrics
+# from both loadtest VMs. No loadtest or upstream services here.
+
+- name: Create monitor project directory
+  file:
+    path: "{{ monitor_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Create prometheus config directory
+  file:
+    path: "{{ monitor_dir }}/prometheus"
+    state: directory
+    mode: '0755'
+
+# ── Stop old stack from previous single-VM setup ──────────────────────────────
+# The old docker-compose.yml ran everything on this host. Clean it up so
+# port conflicts don't prevent the new (monitoring-only) stack from starting.
+- name: Stop and remove old all-in-one stack (if present)
+  command: docker compose down --remove-orphans
+  args:
+    chdir: /opt/proxy-server
+  ignore_errors: yes
+  changed_when: false
+
+# ── Template files ────────────────────────────────────────────────────────────
+- name: Template docker-compose.yml
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ monitor_dir }}/docker-compose.yml"
+
+- name: Template prometheus.yml (all scrape targets with backend labels)
+  template:
+    src: prometheus.yml.j2
+    dest: "{{ monitor_dir }}/prometheus/prometheus.yml"
+
+# ── Copy Grafana config ───────────────────────────────────────────────────────
+- name: Copy Grafana provisioning
+  copy:
+    src: "{{ playbook_dir }}/../docker/grafana/provisioning/"
+    dest: "{{ monitor_dir }}/grafana/provisioning/"
+
+- name: Copy Grafana dashboards
+  copy:
+    src: "{{ playbook_dir }}/../docker/grafana/dashboards/"
+    dest: "{{ monitor_dir }}/grafana/dashboards/"
+
+# ── Pull images ───────────────────────────────────────────────────────────────
+- name: Pull monitoring images
+  command: docker compose pull node-exporter prometheus grafana
+  args:
+    chdir: "{{ monitor_dir }}"
+  ignore_errors: yes
+
+# ── Start stack ───────────────────────────────────────────────────────────────
+- name: Start monitoring stack
+  command: docker compose up -d
+  args:
+    chdir: "{{ monitor_dir }}"
+
+# Prometheus must restart when config changes — Ansible atomic copy changes
+# the inode which Docker bind mounts cache, so HUP is not enough.
+- name: Restart Prometheus to pick up config
+  command: docker compose restart prometheus
+  args:
+    chdir: "{{ monitor_dir }}"
+  changed_when: false
+
+- name: Show monitor VM containers
+  command: docker compose ps
+  args:
+    chdir: "{{ monitor_dir }}"
+  register: ps_out
+  changed_when: false
+
+- name: Monitor VM status
+  debug:
+    msg: "{{ ps_out.stdout_lines }}"

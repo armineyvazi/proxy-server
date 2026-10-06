@@ -1,0 +1,54 @@
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+  scrape_timeout:      10s
+
+scrape_configs:
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # ── Node Exporter ─────────────────────────────────────────────────────────
+  # One job so the Node Exporter Full dashboard finds everything under "node_exporter".
+  # 'host_alias' is set per target; relabeling copies it to 'instance' so Grafana
+  # shows "rust-proxy-server" / "nginx-proxy" / "monitor" instead of raw IPs.
+  - job_name: 'node_exporter'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['{{ proxy_vm_ip }}:9100']
+        labels:
+          host_alias: 'rust-proxy-server'
+          backend:    'proxy-server'
+      - targets: ['{{ nginx_vm_ip }}:9100']
+        labels:
+          host_alias: 'nginx-proxy'
+          backend:    'nginx'
+      - targets: ['node-exporter:9100']
+        labels:
+          host_alias: 'monitor'
+          backend:    'monitor'
+    relabel_configs:
+      # Copy the per-target alias into the 'instance' label.
+      # Prometheus only auto-sets instance from __address__ when instance is absent,
+      # so this takes precedence over the raw IP:port default.
+      - source_labels: [host_alias]
+        target_label:  instance
+
+  # ── Load tester — proxy-server target ─────────────────────────────────────
+  - job_name: 'loadtest_proxy'
+    scrape_interval: 2s
+    static_configs:
+      - targets: ['{{ loadtest_proxy_ip }}:8090']
+        labels:
+          backend:  'proxy-server'
+          instance: 'loadtest-proxy'
+
+  # ── Load tester — nginx target ────────────────────────────────────────────
+  - job_name: 'loadtest_nginx'
+    scrape_interval: 2s
+    static_configs:
+      - targets: ['{{ loadtest_nginx_ip }}:8090']
+        labels:
+          backend:  'nginx'
+          instance: 'loadtest-nginx'

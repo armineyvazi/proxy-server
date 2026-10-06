@@ -1,0 +1,61 @@
+---
+# Proxy VM: Rust proxy-server (or nginx fallback) + node-exporter.
+# Upstream is at {{ upstream_proxy_ip }}:9000
+
+services:
+
+  proxy-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # The proxy validates Host header against the outbound hostname.
+    # Loadtest must send: Host: {{ upstream_proxy_ip }}
+    command: ["--inbound", "0.0.0.0:8080", "--outbound", "{{ upstream_proxy_ip }}:9000"]
+    ports:
+      - "80:8080"
+    init: true
+    restart: unless-stopped
+    profiles: [proxy-server]
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
+    # Ephemeral port exhaustion fix (EADDRNOTAVAIL / errno 99):
+    # Default Linux range 32768-60999 = ~28k ports. At 11k RPS each upstream
+    # connection uses a port for 60s TIME_WAIT → 660k ports needed → exhausted.
+    # Expanding to 1024-65535 gives ~64k ports. tcp_tw_reuse lets the kernel
+    # recycle TIME_WAIT ports immediately for new outbound connections.
+    sysctls:
+      net.ipv4.ip_local_port_range: "1024 65535"
+      net.ipv4.tcp_tw_reuse: "1"
+
+  nginx:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx-proxy.conf:/etc/nginx/conf.d/proxy.conf:ro
+    ports:
+      - "80:8080"
+    restart: unless-stopped
+    profiles: [nginx]
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+      - '--collector.systemd'
+    ports:
+      - "9100:9100"
+    restart: unless-stopped

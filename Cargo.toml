@@ -1,0 +1,15 @@
+[package]
+name = "proxy-server"
+version = "0.1.0"
+edition = "2024"
+description = "HTTP/1.1 reverse proxy using prefork workers, epoll, and shared-memory logging"
+license = "MIT"
+repository = "https://github.com/armineyvazi/proxy-server"
+
+[dependencies]
+libc = "0.2"
+mio = { version = "0.8", features = ["net", "os-poll"] }
+httparse = "1.8"
+
+[dev-dependencies]
+libc = "0.2"

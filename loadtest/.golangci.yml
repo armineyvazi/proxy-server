@@ -1,0 +1,36 @@
+version: "2"
+
+run:
+  timeout: 2m
+
+linters:
+  enable:
+    - errcheck    
+    - govet       
+    - staticcheck 
+    - unused      
+    - ineffassign 
+    - misspell    
+    - gocritic    
+  settings:
+    govet:
+      enable:
+        - shadow
+        - printf
+        - structtag
+    staticcheck:
+      checks: ["all", "-SA1019"] 
+    misspell:
+      locale: US
+    gocritic:
+      enabled-tags: [diagnostic, performance]
+      disabled-checks: [hugeParam]
+  exclusions:
+    rules:
+      - path: ui\.go
+        linters: [misspell, gocritic]
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

@@ -1,0 +1,6 @@
+---
+- name: restart proxy-server
+  systemd:
+    name: proxy-server
+    state: restarted
+  when: proxy_backend == "proxy-server"

@@ -1,0 +1,174 @@
+---
+# Copy project source to VM and start the full stack with docker compose.
+
+- name: Create project directory
+  file:
+    path: "{{ project_dir }}"
+    state: directory
+    mode: '0755'
+
+# ── Copy only the files docker compose needs ──────────────────────────────────
+- name: Copy Dockerfile
+  copy:
+    src: "{{ playbook_dir }}/../Dockerfile"
+    dest: "{{ project_dir }}/Dockerfile"
+
+- name: Copy .dockerignore
+  copy:
+    src: "{{ playbook_dir }}/../.dockerignore"
+    dest: "{{ project_dir }}/.dockerignore"
+
+- name: Copy docker-compose.yml
+  copy:
+    src: "{{ playbook_dir }}/../docker-compose.yml"
+    dest: "{{ project_dir }}/docker-compose.yml"
+  register: compose_file
+
+- name: Copy Cargo.toml
+  copy:
+    src: "{{ playbook_dir }}/../Cargo.toml"
+    dest: "{{ project_dir }}/Cargo.toml"
+  register: cargo_toml
+
+- name: Copy Cargo.lock
+  copy:
+    src: "{{ playbook_dir }}/../Cargo.lock"
+    dest: "{{ project_dir }}/Cargo.lock"
+
+- name: Copy src/ directory
+  copy:
+    src: "{{ playbook_dir }}/../src/"
+    dest: "{{ project_dir }}/src/"
+  register: src_dir
+
+- name: Copy docker/ directory
+  copy:
+    src: "{{ playbook_dir }}/../docker/"
+    dest: "{{ project_dir }}/docker/"
+
+- name: Copy loadtest/ directory
+  copy:
+    src: "{{ playbook_dir }}/../loadtest/"
+    dest: "{{ project_dir }}/loadtest/"
+
+# vendor/ and .cargo/config.toml make the build fully offline (crates.io is
+# unreachable from the VM). cargo vendor was run locally and the output is
+# committed so Docker can build --offline without any network access.
+- name: Copy .cargo/ config (offline vendored sources)
+  copy:
+    src: "{{ playbook_dir }}/../.cargo/"
+    dest: "{{ project_dir }}/.cargo/"
+
+- name: Sync vendor/ directory via rsync (offline Cargo deps, ~84 MB first time)
+  synchronize:
+    src: "{{ playbook_dir }}/../vendor/"
+    dest: "{{ project_dir }}/vendor/"
+    delete: yes
+    compress: yes
+    rsync_opts:
+      - "--checksum"
+  register: vendor_dir
+
+# ── Build loadtest image (Go stdlib only, no module download needed) ──────────
+- name: Build loadtest image
+  command: docker compose build loadtest
+  args:
+    chdir: "{{ project_dir }}"
+  environment:
+    DOCKER_BUILDKIT: "1"
+    BUILDKIT_PROGRESS: "plain"
+
+# ── Start monitoring stack first (no build needed, just pull) ────────────────
+- name: Pull monitoring images via registry mirror
+  command: docker compose pull node-exporter prometheus grafana
+  args:
+    chdir: "{{ project_dir }}"
+  environment:
+    DOCKER_BUILDKIT: "1"
+  ignore_errors: yes
+
+- name: Start monitoring stack (node-exporter, prometheus, grafana)
+  command: docker compose up -d node-exporter prometheus grafana
+  args:
+    chdir: "{{ project_dir }}"
+  environment:
+    DOCKER_BUILDKIT: "1"
+
+# Prometheus must restart (not just reload) when its config file changes because
+# Ansible's atomic copy changes the inode and bind mounts cache the old one.
+- name: Restart Prometheus to pick up config changes
+  command: docker compose restart prometheus
+  args:
+    chdir: "{{ project_dir }}"
+  changed_when: false
+
+- name: Start loadtest service
+  command: docker compose up -d loadtest
+  args:
+    chdir: "{{ project_dir }}"
+  environment:
+    DOCKER_BUILDKIT: "1"
+
+# ── Build proxy-server image (slow first time, fast after cache warms) ────────
+# BuildKit cache mounts in the Dockerfile keep cargo registry and incremental
+# build artifacts on the host between runs. After the first build, only changed
+# .rs files are recompiled — typically < 30 seconds.
+- name: Build proxy-server image (BuildKit cache enabled)
+  command: docker compose build proxy-server
+  args:
+    chdir: "{{ project_dir }}"
+  environment:
+    DOCKER_BUILDKIT: "1"
+    BUILDKIT_PROGRESS: "plain"   # show each compiler step instead of a spinner
+  when: cargo_toml.changed or src_dir.changed or compose_file.changed or vendor_dir.changed
+
+- name: Ensure proxy-server image exists (first deploy)
+  command: docker image inspect proxy-server-proxy-server
+  register: image_check
+  ignore_errors: yes
+  changed_when: false
+
+- name: Build proxy-server image (first deploy, no prior cache)
+  command: docker compose build proxy-server
+  args:
+    chdir: "{{ project_dir }}"
+  environment:
+    DOCKER_BUILDKIT: "1"
+    BUILDKIT_PROGRESS: "plain"
+  when: image_check.rc != 0
+
+# ── Start the active proxy backend ────────────────────────────────────────────
+# Stop any leftover proxy containers first (port 8080 may be held by a
+# stale container from a previous failed deploy or a previous backend switch).
+- name: Stop any running proxy-server or nginx containers
+  command: docker compose stop proxy-server nginx
+  args:
+    chdir: "{{ project_dir }}"
+  ignore_errors: yes
+  changed_when: false
+
+- name: Remove stopped proxy-server or nginx containers (free port 8080)
+  command: docker compose rm -f proxy-server nginx
+  args:
+    chdir: "{{ project_dir }}"
+  ignore_errors: yes
+  changed_when: false
+
+- name: Start upstream and {{ proxy_backend }}
+  command: docker compose --profile {{ proxy_backend }} up -d upstream {{ proxy_backend }}
+  args:
+    chdir: "{{ project_dir }}"
+  environment:
+    DOCKER_BUILDKIT: "1"
+
+# ── Show final status ─────────────────────────────────────────────────────────
+- name: Show running containers
+  command: docker compose ps
+  args:
+    chdir: "{{ project_dir }}"
+  register: ps_out
+  changed_when: false
+
+- name: Stack status
+  debug:
+    msg: "{{ ps_out.stdout_lines }}"

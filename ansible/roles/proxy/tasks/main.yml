@@ -1,0 +1,134 @@
+---
+# Deploys the Rust proxy-server + node-exporter on the proxy VM.
+# Upstream is the separate VM at {{ upstream_proxy_ip }}:9000.
+
+- name: Create proxy project directory
+  file:
+    path: "{{ proxy_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Template docker-compose.yml (injects upstream_proxy_ip)
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ proxy_dir }}/docker-compose.yml"
+  register: compose_file
+
+- name: Template nginx.conf (tuned worker/fd/keepalive settings)
+  template:
+    src: nginx.conf.j2
+    dest: "{{ proxy_dir }}/nginx.conf"
+
+- name: Template nginx-proxy.conf
+  template:
+    src: nginx-proxy.conf.j2
+    dest: "{{ proxy_dir }}/nginx-proxy.conf"
+
+- name: Copy Dockerfile
+  copy:
+    src: "{{ playbook_dir }}/../Dockerfile"
+    dest: "{{ proxy_dir }}/Dockerfile"
+
+- name: Copy .dockerignore
+  copy:
+    src: "{{ playbook_dir }}/../.dockerignore"
+    dest: "{{ proxy_dir }}/.dockerignore"
+
+- name: Copy Cargo.toml
+  copy:
+    src: "{{ playbook_dir }}/../Cargo.toml"
+    dest: "{{ proxy_dir }}/Cargo.toml"
+  register: cargo_toml
+
+- name: Copy Cargo.lock
+  copy:
+    src: "{{ playbook_dir }}/../Cargo.lock"
+    dest: "{{ proxy_dir }}/Cargo.lock"
+
+- name: Copy src/ directory
+  copy:
+    src: "{{ playbook_dir }}/../src/"
+    dest: "{{ proxy_dir }}/src/"
+  register: src_dir
+
+- name: Copy .cargo/ config (offline vendored sources)
+  copy:
+    src: "{{ playbook_dir }}/../.cargo/"
+    dest: "{{ proxy_dir }}/.cargo/"
+
+- name: Sync vendor/ directory via rsync (~84 MB, checksum-based)
+  synchronize:
+    src: "{{ playbook_dir }}/../vendor/"
+    dest: "{{ proxy_dir }}/vendor/"
+    delete: yes
+    compress: yes
+    rsync_opts:
+      - "--checksum"
+  register: vendor_dir
+
+- name: Build proxy-server image (only when source changed)
+  command: docker compose build proxy-server
+  args:
+    chdir: "{{ proxy_dir }}"
+  environment:
+    DOCKER_BUILDKIT: "1"
+    BUILDKIT_PROGRESS: "plain"
+  when: cargo_toml.changed or src_dir.changed or vendor_dir.changed or compose_file.changed
+
+- name: Ensure proxy-server image exists (first deploy)
+  command: docker image inspect proxy-stack-proxy-server
+  register: image_check
+  ignore_errors: yes
+  changed_when: false
+
+- name: Build proxy-server image (first deploy)
+  command: docker compose build proxy-server
+  args:
+    chdir: "{{ proxy_dir }}"
+  environment:
+    DOCKER_BUILDKIT: "1"
+    BUILDKIT_PROGRESS: "plain"
+  when: image_check.rc != 0
+
+- name: Pull node-exporter image
+  command: docker compose pull node-exporter
+  args:
+    chdir: "{{ proxy_dir }}"
+  ignore_errors: yes
+
+- name: Stop any running proxy containers (free port 80)
+  command: docker compose stop proxy-server nginx
+  args:
+    chdir: "{{ proxy_dir }}"
+  ignore_errors: yes
+  changed_when: false
+
+- name: Remove stopped proxy containers
+  command: docker compose rm -f proxy-server nginx
+  args:
+    chdir: "{{ proxy_dir }}"
+  ignore_errors: yes
+  changed_when: false
+
+- name: Start node-exporter
+  command: docker compose up -d node-exporter
+  args:
+    chdir: "{{ proxy_dir }}"
+
+- name: Start proxy-server
+  command: docker compose --profile proxy-server up -d proxy-server
+  args:
+    chdir: "{{ proxy_dir }}"
+  environment:
+    DOCKER_BUILDKIT: "1"
+
+- name: Show proxy VM containers
+  command: docker compose ps
+  args:
+    chdir: "{{ proxy_dir }}"
+  register: ps_out
+  changed_when: false
+
+- name: Proxy VM status
+  debug:
+    msg: "{{ ps_out.stdout_lines }}"

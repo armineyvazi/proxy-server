@@ -1,0 +1,74 @@
+---
+# Deploys the Go upstream benchmark service + node-exporter on the upstream VM.
+
+- name: Create upstream project directory
+  file:
+    path: "{{ upstream_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Create upstream/upstream subdirectory (Docker build context)
+  file:
+    path: "{{ upstream_dir }}/upstream"
+    state: directory
+    mode: '0755'
+
+- name: Copy docker-compose.yml
+  copy:
+    src: docker-compose.yml
+    dest: "{{ upstream_dir }}/docker-compose.yml"
+
+- name: Copy upstream Go source
+  copy:
+    src: "{{ playbook_dir }}/../docker/upstream/"
+    dest: "{{ upstream_dir }}/upstream/"
+  register: upstream_src
+
+# ── Build and start ───────────────────────────────────────────────────────────
+- name: Build upstream image
+  command: docker compose build upstream
+  args:
+    chdir: "{{ upstream_dir }}"
+  environment:
+    DOCKER_BUILDKIT: "1"
+    BUILDKIT_PROGRESS: "plain"
+  when: upstream_src.changed
+
+- name: Ensure upstream image exists (first deploy)
+  command: docker image inspect upstream-upstream
+  register: image_check
+  ignore_errors: yes
+  changed_when: false
+
+- name: Build upstream image (first deploy)
+  command: docker compose build upstream
+  args:
+    chdir: "{{ upstream_dir }}"
+  environment:
+    DOCKER_BUILDKIT: "1"
+    BUILDKIT_PROGRESS: "plain"
+  when: image_check.rc != 0
+
+- name: Pull node-exporter image
+  command: docker compose pull node-exporter
+  args:
+    chdir: "{{ upstream_dir }}"
+  ignore_errors: yes
+
+- name: Start upstream services
+  command: docker compose up -d
+  args:
+    chdir: "{{ upstream_dir }}"
+  environment:
+    DOCKER_BUILDKIT: "1"
+
+- name: Show upstream VM containers
+  command: docker compose ps
+  args:
+    chdir: "{{ upstream_dir }}"
+  register: ps_out
+  changed_when: false
+
+- name: Upstream VM status
+  debug:
+    msg: "{{ ps_out.stdout_lines }}"

@@ -1,0 +1,19 @@
+[Unit]
+Description=ArvanCloud HTTP Reverse Proxy (Rust)
+After=network.target upstream.service
+Wants=upstream.service
+
+[Service]
+ExecStart=/usr/local/bin/proxy-server \
+    --inbound 0.0.0.0:{{ proxy_port }} \
+    --outbound {{ upstream_host }}:{{ upstream_port }}
+Restart=always
+RestartSec=1s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=proxy-server
+# Worker processes inherit this limit
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

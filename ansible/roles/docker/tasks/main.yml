@@ -1,0 +1,86 @@
+---
+# Install Docker CE and the Compose plugin on Ubuntu/Debian.
+# Idempotent: skips steps already done on re-runs.
+
+- name: Install apt prerequisites
+  apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - rsync
+    state: present
+    update_cache: yes
+
+- name: Create Docker GPG keyring directory
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Download Docker official GPG key
+  shell: |
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+    gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  args:
+    creates: /etc/apt/keyrings/docker.gpg
+
+- name: Add Docker apt repository
+  shell: |
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+      https://download.docker.com/linux/ubuntu \
+      $(lsb_release -cs) stable" \
+      | tee /etc/apt/sources.list.d/docker.list > /dev/null
+  args:
+    creates: /etc/apt/sources.list.d/docker.list
+
+- name: Install Docker CE and Compose plugin
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+    update_cache: yes
+
+# ── Fix: remove broken SOCKS proxy that blocks Docker Hub ────────────────────
+# The VM had a SOCKS proxy configured at 127.0.0.1:1080 for Docker, but that
+# proxy is not running → EOF when pulling images.
+# Fix: delete the proxy override and configure ArvanCloud's registry mirror
+# (works from Iran without needing a proxy).
+
+- name: Remove Docker systemd proxy override (broken SOCKS 127.0.0.1:1080)
+  file:
+    path: /etc/systemd/system/docker.service.d/http-proxy.conf
+    state: absent
+  notify: restart docker
+
+- name: Configure Docker daemon with ArvanCloud registry mirror
+  copy:
+    dest: /etc/docker/daemon.json
+    content: |
+      {
+        "registry-mirrors": [
+          "https://docker.arvancloud.ir",
+          "https://registry.docker.ir"
+        ]
+      }
+  notify: restart docker
+
+- name: Reload systemd after proxy removal
+  systemd:
+    daemon_reload: yes
+
+- name: Start and enable Docker daemon
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Verify Docker can reach the registry mirror
+  command: docker info
+  changed_when: false
